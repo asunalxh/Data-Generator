@@ -1,0 +1,69 @@
+{
+  "domain": {
+    "A": 19,
+    "B": 2,
+    "C": 4,
+    "D": 100,
+    "E": 8,
+    "F": 16,
+    "G": 4,
+    "H": 2,
+    "I": 60,
+    "J": 2
+  },
+  "distribution": {
+    "C": {
+      "from": [
+        "A",
+        "B"
+      ],
+      "max_dependency_internal": [
+        0.8,
+        0.95
+      ],
+      "default": "normal"
+    },
+    "E": {
+      "from": [
+        "C",
+        "D"
+      ],
+      "max_dependency_internal": [
+        0.8,
+        0.95
+      ],
+      "default": "normal"
+    },
+    "G": {
+      "from": [
+        "F"
+      ],
+      "max_dependency_internal": [
+        0.8,
+        0.95
+      ],
+      "default": "normal"
+    },
+    "H": {
+      "from": [
+        "E",
+        "G"
+      ],
+      "max_dependency_internal": [
+        0.8,
+        0.95
+      ],
+      "default": "normal"
+    },
+    "J": {
+      "from": [
+        "I"
+      ],
+      "max_dependency_internal": [
+        0.8,
+        0.95
+      ],
+      "default": "normal"
+    }
+  }
+}
