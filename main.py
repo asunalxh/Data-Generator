@@ -5,6 +5,7 @@ import random
 from copy import copy
 
 import numpy as np
+import pandas as pd
 
 
 def init_config(config):
@@ -13,16 +14,21 @@ def init_config(config):
     :param config: 配置文件，dict格式
     :return:
     """
-    attributes = set(config['domain'].keys())
+    attributes = list(config['domain'].keys())
     attributes_set = set(attributes)
     attr_map = {x: i for i, x in enumerate(attributes)}
 
     domain = dict()
+    distribution = dict()
     for attr, size in config['domain'].items():
         domain[attr_map[attr]] = size
+        distribution[attr_map[attr]] = {
+            "from": [],
+            "max_dependency_internal": [],
+            "default": "uniform"
+        }
 
     check = set()
-    distribution = dict()
     for node, info in config['distribution'].items():
         assert set(info['from']) <= attributes_set
         assert node in attributes_set and node not in check
@@ -81,28 +87,52 @@ def generate_data(domain, distribution, seq, number=10000):
         ret = [(round(unit_len * i), round(unit_len * (i + 1))) for i in range(number)]
         return ret
 
+    def generate_with_distribution(low, high, size, method, probability=None):
+        if method == 'binomial':
+            ret = np.random.binomial(high - low, 0.5, size)
+            ret = ret + low
+        else:
+            ret = np.random.randint(low, high, size)
+
+        if len(probability) == 2:
+            assert probability[0] <= probability[1]
+            p = np.random.uniform(probability[0], probability[1])
+            target = np.random.randint(low, high)
+            index = np.random.choice(size, round(size * p), replace=False)
+            ret[index] = target
+
+        return ret
+
     data = np.zeros((number, len(domain)))
     for attr in seq:
-        method = 'uniform' if attr not in distribution else distribution[attr]['default']
-
-        if attr in distribution and len(distribution[attr]['from']) > 0:
+        if len(distribution[attr]['from']) > 0:
             internals = []
             for node in distribution[attr]['from']:
                 candidates = np.arange(domain[node])
-                weights = np.exp(-candidates)
+                weights = np.exp(-candidates / 2)
                 weights = weights / weights.sum()
                 internals.append(split_internal(domain[node], np.random.choice(candidates, p=weights) + 1))
 
             for x in itertools.product(*internals):
-
+                selector = np.full(number, True)
+                for (low, high), i in zip(x, distribution[attr]['from']):
+                    selector &= ((data[:, i] >= low) & (data[:, i] < high))
+                data[:, attr][selector] = generate_with_distribution(0, domain[attr], np.count_nonzero(selector),
+                                                                     distribution[attr]['default'],
+                                                                     distribution[attr]['max_dependency_internal'])
+        else:
+            data[:, attr] = generate_with_distribution(0, domain[attr], number,
+                                                       distribution[attr]['default'],
+                                                       distribution[attr]['max_dependency_internal'])
+    return data
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-
     with open('config.json', 'r', encoding='utf-8') as df:
         config = json.load(df)
 
     domain, distribution, attributes_name = init_config(config)
     seq = topological_sequence(distribution, domain)
-    generate_data(domain, distribution, seq)
+    data = generate_data(domain, distribution, seq, 50000)
+    dataFrame = pd.DataFrame(data, columns=attributes_name)
+    dataFrame.to_csv('test.csv', index=False)

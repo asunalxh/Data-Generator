@@ -32,8 +32,8 @@
         0.80,
         0.95
       ],
-      //生成项非特殊值以外的概率分布，可选择normal,uniform，默认为uniform
-      "default": "normal"
+      //生成项非特殊值以外的概率分布，可选择binomial,uniform，默认为uniform
+      "default": "binomial"
     },
     "A": {
       "from": [],
