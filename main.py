@@ -20,8 +20,20 @@ def init_config(config):
 
     domain = dict()
     distribution = dict()
+    domain_map = dict()
     for attr, size in config['domain'].items():
-        domain[attr_map[attr]] = size
+        if isinstance(size, list):
+            domain[attr_map[attr]] = len(size)
+            domain_map[attr_map[attr]] = size
+        elif isinstance(size, dict):
+            assert set(size.keys()) >= {'low', 'high', 'step'}
+            assert isinstance(size['low'], int) and isinstance(size['high'], int) and isinstance(size['step'], int)
+            domain_map[attr_map[attr]] = range(size['low'], size['high'], size['step'])
+            domain[attr_map[attr]] = len(domain_map[attr_map[attr]])
+        else:
+            assert isinstance(size, int)
+            domain[attr_map[attr]] = size
+
         distribution[attr_map[attr]] = {
             "from": [],
             "max_dependency_internal": [],
@@ -38,7 +50,7 @@ def init_config(config):
         tmp['from'] = list(map(lambda x: attr_map[x], info['from']))
         distribution[attr_map[node]] = tmp
 
-    return domain, distribution, attributes
+    return domain, distribution, attributes, domain_map
 
 
 def topological_sequence(distribution, domain):
@@ -131,8 +143,16 @@ if __name__ == '__main__':
     with open('config.json', 'r', encoding='utf-8') as df:
         config = json.load(df)
 
-    domain, distribution, attributes_name = init_config(config)
+    domain, distribution, attributes_name, domain_map = init_config(config)
     seq = topological_sequence(distribution, domain)
     data = generate_data(domain, distribution, seq, 50000)
+
+    for attr, mlist in domain_map.items():
+        mark = np.full(len(data), True)
+        for i, val in enumerate(mlist):
+            selector = mark & (data[:, attr] == i)
+            data[:, attr][selector] = val
+            mark[selector] = False
+
     dataFrame = pd.DataFrame(data, columns=attributes_name)
     dataFrame.to_csv('test.csv', index=False)
