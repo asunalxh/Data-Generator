@@ -1,6 +1,7 @@
 import argparse
 import itertools
 import json
+import os.path
 import random
 from copy import copy
 
@@ -28,11 +29,12 @@ def init_config(config):
         elif isinstance(size, dict):
             assert set(size.keys()) >= {'low', 'high', 'step'}
             assert isinstance(size['low'], int) and isinstance(size['high'], int) and isinstance(size['step'], int)
-            domain_map[attr_map[attr]] = range(size['low'], size['high'], size['step'])
+            domain_map[attr_map[attr]] = list(range(size['low'], size['high'], size['step']))
             domain[attr_map[attr]] = len(domain_map[attr_map[attr]])
         else:
             assert isinstance(size, int)
             domain[attr_map[attr]] = size
+            domain_map[attr_map[attr]] = list(range(size))
 
         distribution[attr_map[attr]] = {
             "from": [],
@@ -115,7 +117,7 @@ def generate_data(domain, distribution, seq, number=10000):
 
         return ret
 
-    data = np.zeros((number, len(domain)))
+    data = np.zeros((number, len(domain))).astype(int)
     for attr in seq:
         if len(distribution[attr]['from']) > 0:
             internals = []
@@ -140,12 +142,20 @@ def generate_data(domain, distribution, seq, number=10000):
 
 
 if __name__ == '__main__':
-    with open('config.json', 'r', encoding='utf-8') as df:
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-c', '--config', default='config-1.json', help='配置文件地址')
+    parser.add_argument('-s', '--size', default=100000, help='数据集大小', type=int)
+    parser.add_argument('-n', '--name', default='data', help='生成的数据文件名称')
+    parser.add_argument('-t', '--to', default='out', help='输出数据的文件夹地址')
+    args = parser.parse_args()
+
+    with open(args.config, 'r', encoding='utf-8') as df:
         config = json.load(df)
 
     domain, distribution, attributes_name, domain_map = init_config(config)
     seq = topological_sequence(distribution, domain)
-    data = generate_data(domain, distribution, seq, 50000)
+    data = generate_data(domain, distribution, seq, 100000)
 
     for attr, mlist in domain_map.items():
         mark = np.full(len(data), True)
@@ -155,4 +165,13 @@ if __name__ == '__main__':
             mark[selector] = False
 
     dataFrame = pd.DataFrame(data, columns=attributes_name)
-    dataFrame.to_csv('test.csv', index=False)
+
+    if not os.path.exists(args.to):
+        os.makedirs(args.to)
+
+    dataFrame.to_csv(os.path.join(args.to, f"{args.name}.csv"), index=False)
+    with open(os.path.join(args.to, f"{args.name}-domain.json"), 'w', encoding='utf-8') as df:
+        json.dump(dict(zip(attributes_name, domain.values())), df)
+
+    with open(os.path.join(args.to, f"{args.name}-domain_detail.json"), 'w', encoding='utf-8') as df:
+        json.dump(dict(zip(attributes_name, domain_map.values())), df)
